@@ -12,6 +12,8 @@ import io.github.hzkitty.entity.OcrResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
+import com.autobook.lingxi.data.AppDatabase
+import com.autobook.lingxi.data.BillEntity
 
 class RecognitionWorker(
     private val context: Context,
@@ -19,7 +21,6 @@ class RecognitionWorker(
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        // 1. 获取传递过来的 Uri 字符串
         val imageUriString = inputData.getString("IMAGE_PATH") ?: return Result.failure()
         val imageUri = Uri.parse(imageUriString)
 
@@ -27,28 +28,45 @@ class RecognitionWorker(
 
         return withContext(Dispatchers.IO) {
             try {
-                // 2. 【核心修改】通过 ContentResolver 读取流
                 val bitmap = decodeBitmapFromUri(context, imageUri)
-
                 if (bitmap == null) {
-                    Log.e("AutoBook", "❌ 图片加载失败，无法解码 Uri")
+                    Log.e("AutoBook", "❌ 图片加载失败")
                     return@withContext Result.failure()
                 }
 
-                // 3. 识别
                 val result = runRapidOCR(context, bitmap)
                 val rawText = result.strRes
+                // Log.i("AutoBook", "OCR 原始内容:\n$rawText") // 日志太多可以注释掉这行
 
-                Log.i("AutoBook", "🎉 识别成功! 原始内容如下:\n${result.strRes}")
+                // 调用升级版规则引擎
+                val billList = com.autobook.lingxi.logic.BillParser.parse(rawText)
 
-                // 4. 【新增】调用规则引擎进行分析
-                val billInfo = com.autobook.lingxi.logic.BillParser.parse(rawText)
+                if (billList.isNotEmpty()) {
+                    Log.d("AutoBook", "✅ 成功提取到 ${billList.size} 笔账单！准备存入数据库...")
 
-                if (billInfo != null) {
-                    Log.d("AutoBook", "✅ 规则引擎提取成功! \n金额: ${billInfo.amount} \n商户: ${billInfo.merchant}")
-                    // TODO: 存入数据库
+                    // 1. 转换数据格式 (BillInfo -> BillEntity)
+                    val entities = billList.map { bill ->
+                        com.autobook.lingxi.data.BillEntity(
+                            amount = bill.amount,
+                            merchant = bill.merchant,
+                            dateStr = bill.date,
+                            timestamp = System.currentTimeMillis(),
+                            type = if (bill.amount > 0) "支出" else "收入" // 简单判断
+                        )
+                    }
+
+                    // 2. 获取数据库实例
+                    val database = com.autobook.lingxi.data.AppDatabase.getDatabase(context)
+
+                    // 3. 存入数据库
+                    database.billDao().insertAll(entities)
+
+                    // 4. 验证一下是否存进去了
+                    val count = database.billDao().getCount()
+                    Log.i("AutoBook", "💾 数据保存成功！当前数据库里共有 $count 笔账单。")
+
                 } else {
-                    Log.w("AutoBook", "⚠️ 规则引擎无法识别此账单 (稍后将交给 AI 大模型处理)")
+                    Log.w("AutoBook", "⚠️ 规则引擎未提取到有效账单")
                 }
 
                 bitmap.recycle()
@@ -60,7 +78,6 @@ class RecognitionWorker(
         }
     }
 
-    // 辅助方法：安全地从 Uri 加载 Bitmap
     private fun decodeBitmapFromUri(context: Context, uri: Uri): Bitmap? {
         var inputStream: InputStream? = null
         try {
