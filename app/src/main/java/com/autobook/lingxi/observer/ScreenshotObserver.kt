@@ -1,6 +1,6 @@
 package com.autobook.lingxi.observer
 
-import android.content.ContentUris // ✅ 关键修复：补上了这个引用
+import android.content.ContentUris
 import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
@@ -18,6 +18,12 @@ class ScreenshotObserver(
     handler: Handler = Handler(Looper.getMainLooper())
 ) : ContentObserver(handler) {
 
+    // 【新增】记录上一次处理的图片 ID，防止重复触发
+    private var lastProcessedId: Long = -1L
+
+    // 【新增】记录上一次处理的时间，防止极短时间内重复处理同一ID（双重保险）
+    private var lastProcessedTime: Long = 0L
+
     override fun onChange(selfChange: Boolean, uri: Uri?) {
         super.onChange(selfChange, uri)
         handleMediaChange()
@@ -34,6 +40,7 @@ class ScreenshotObserver(
         val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
         try {
+            // 只查询最新的一条
             context.contentResolver.query(contentUri, projection, null, null, sortOrder)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val idCol = cursor.getColumnIndex(MediaStore.Images.Media._ID)
@@ -44,17 +51,23 @@ class ScreenshotObserver(
                     val path = cursor.getString(pathCol) ?: ""
                     val name = cursor.getString(nameCol) ?: ""
 
+                    // 【核心修复】防抖动检查
+                    // 1. 如果这张图的 ID 和上次一样，说明是重复通知，直接跳过
+                    if (id == lastProcessedId) {
+                        return
+                    }
+
+                    // 2. 更新最后处理的 ID
+                    lastProcessedId = id
+
                     // 如果是截图，则构造 Uri 并发送
                     if (isScreenshot(path, name)) {
-                        // 构造 content:// 格式的 Uri
                         val imageUri = ContentUris.withAppendedId(
                             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                             id
                         )
 
-                        Log.d("AutoBook", "检测到截图，发送 Uri: $imageUri")
-
-                        // 发送 Uri 字符串给 Worker
+                        Log.d("AutoBook", "📸 检测到新截图 (ID=$id)，准备分析...")
                         triggerRecognitionWork(imageUri.toString())
                     }
                 }
@@ -72,16 +85,13 @@ class ScreenshotObserver(
     }
 
     private fun triggerRecognitionWork(imageUriString: String) {
-        // 1. 封装数据 (注意：key 还是 IMAGE_PATH，但 value 是 Uri 字符串)
         val inputData = workDataOf("IMAGE_PATH" to imageUriString)
 
-        // 2. 创建任务
         val workRequest = OneTimeWorkRequestBuilder<RecognitionWorker>()
             .setInputData(inputData)
             .addTag("OCR_TASK")
             .build()
 
-        // 3. 提交
         WorkManager.getInstance(context).enqueue(workRequest)
         Log.d("AutoBook", "🚀 任务已提交给 WorkManager 队列")
     }
