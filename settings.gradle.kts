@@ -19,6 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "灵犀记账"
+rootProject.name = "AutoBook"
 include(":app")
- 

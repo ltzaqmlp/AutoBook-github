@@ -49,16 +49,16 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
-    // 🔥 必须有的图标扩展库 (解决 Icons.Default.AutoAwesome 报错)
+    // 图标扩展库
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
-    // 🔥 必须有的 ViewModel 适配库 (解决 viewModel() 报错)
+    // ViewModel 适配库
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
 
     // 2. 异步任务
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation(libs.androidx.work.runtime.ktx)
 
-    // 3. Room 数据库 (已清理重复项)
+    // 3. Room 数据库
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

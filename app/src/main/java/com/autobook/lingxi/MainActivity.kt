@@ -49,6 +49,7 @@ import com.autobook.lingxi.ui.components.TrendChart
 import com.autobook.lingxi.viewmodel.BillViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import androidx.compose.ui.window.Dialog
 
 class MainActivity : ComponentActivity() {
     private var screenshotObserver: ScreenshotObserver? = null
@@ -275,7 +276,7 @@ fun MainScreen() {
     }
 }
 
-// --- ✨ 核心组件：带红色圆钮的侧滑菜单 ✨ ---
+// --- ✨ 修复版：绝对精准的侧滑组件 ✨ ---
 @Composable
 fun SwipeToRevealItem(
     onDeleteClick: (resetMenu: () -> Unit) -> Unit,
@@ -294,29 +295,36 @@ fun SwipeToRevealItem(
 
     Box(
         modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.CenterEnd // 1. 确保背景层整体靠右
+        contentAlignment = Alignment.CenterEnd // 1. 全局靠右
     ) {
         // --- 背景层 (红色圆圈按钮) ---
         Box(
             modifier = Modifier
-                .width(actionWidth)     // 限制背景层宽度为 80dp
-                .matchParentSize()      // 填满父容器高度
-                .clickable { onDeleteClick(resetMenu) },
-            contentAlignment = Alignment.Center // 2. 确保圆圈在 80dp 区域内居中
+                .matchParentSize(), // 2. 这个盒子负责填满高度，不限宽度
+            contentAlignment = Alignment.CenterEnd // 3. 它的内容必须靠右
         ) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.error,
-                shadowElevation = 4.dp
+            // 4. 这才是真正的红色按钮区域
+            Box(
+                modifier = Modifier
+                    .width(actionWidth)     // 限制宽度 80dp
+                    .fillMaxHeight()        // 填满高度
+                    .clickable { onDeleteClick(resetMenu) },
+                contentAlignment = Alignment.Center // 图标在按钮内居中
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.onError,
-                        modifier = Modifier.size(24.dp)
-                    )
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.error,
+                    shadowElevation = 4.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.onError,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
