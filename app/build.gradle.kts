@@ -2,13 +2,12 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ksp) // 确保这里有这行
-
+    alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "com.autobook.lingxi"
-    compileSdk = 34 // 必须至少是 34
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.autobook.lingxi"
@@ -24,26 +23,23 @@ android {
             }
         }
     }
-    // 【新增/修改】强制使用 Java 17，解决 (1.8) vs (21) 的冲突
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-
     }
 
-    // 【新增】让 Kotlin 编译器也输出 Java 17
     kotlinOptions {
         jvmTarget = "17"
     }
+
     buildFeatures {
         compose = true
     }
-
-    // Kotlin 2.0 不需要 composeOptions，已删除
 }
 
 dependencies {
-    // 1. 基础 UI 和 Core
+    // 1. Android 核心 & Compose UI
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -53,22 +49,20 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
-    // 2. 异步
+    // 🔥 必须有的图标扩展库 (解决 Icons.Default.AutoAwesome 报错)
+    implementation("androidx.compose.material:material-icons-extended:1.6.8")
+    // 🔥 必须有的 ViewModel 适配库 (解决 viewModel() 报错)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
+
+    // 2. 异步任务
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // 3. Room 数据库
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    // 【关键修改】如果 ksp(...) 爆红，用 add("ksp", ...) 是 100% 安全的写法
-    add("ksp", libs.androidx.room.compiler)
-
-    // 4. WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
-    implementation(libs.rapidocr.android)
-
-    // 【新增】Room 数据库依赖
+    // 3. Room 数据库 (已清理重复项)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler) // 使用 ksp 处理注解
+    ksp(libs.androidx.room.compiler)
+
+    // 4. OCR 引擎
+    implementation(libs.rapidocr.android)
 }
